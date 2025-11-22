@@ -30,11 +30,19 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   AppProvider() {
     _initLoad();
     WidgetsBinding.instance.addObserver(this);
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 2),
-      (_) => _syncStateFromStorage(),
-    );
+    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (_isProcessing) return;
+      _isProcessing = true;
+      try {
+        await _syncStateFromStorage();
+        await _checkForegroundAlarms();
+      } finally {
+        _isProcessing = false;
+      }
+    });
   }
+
+  bool _isProcessing = false;
 
   @override
   void dispose() {
@@ -141,6 +149,93 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         notifyListeners();
       }
     }
+
+    final String? logsJson = _prefs!.getString('logs');
+    if (logsJson != null) {
+      final String currentLogsJson = jsonEncode(
+        _logs.map((l) => l.toJson()).toList(),
+      );
+
+      if (logsJson != currentLogsJson) {
+        final List<dynamic> decoded = jsonDecode(logsJson);
+        _logs = decoded.map((item) => HistoryLog.fromJson(item)).toList();
+        notifyListeners();
+      }
+    }
+  }
+
+  // 記錄已處理的鬧鐘，避免重複觸發 (alarmId -> 觸發時間戳)
+  final Map<String, DateTime> _processedAlarms = {};
+
+  Future<void> _checkForegroundAlarms() async {
+    if (_prefs == null) return;
+    final now = DateTime.now();
+    bool stateChanged = false;
+
+    for (int i = 0; i < _alarms.length; i++) {
+      final alarm = _alarms[i];
+      if (alarm.status == AlarmStatus.ready) {
+        // 檢查時間是否匹配 (在同一分鐘內)
+        if (now.hour == alarm.time.hour && now.minute == alarm.time.minute) {
+          // 檢查是否在本分鐘內已經處理過 (記憶體快取)
+          final lastProcessed = _processedAlarms[alarm.id];
+          if (lastProcessed != null &&
+              lastProcessed.year == now.year &&
+              lastProcessed.month == now.month &&
+              lastProcessed.day == now.day &&
+              lastProcessed.hour == now.hour &&
+              lastProcessed.minute == now.minute) {
+            // 本分鐘內已處理過，跳過
+            continue;
+          }
+
+          // 檢查是否在最近 1 分鐘內已經處理過 (持久化快取)
+          final stableId = generateStableId(alarm.id);
+          final lastDispenseKey = 'last_dispense_$stableId';
+          final lastDispenseTimestamp = _prefs!.getInt(lastDispenseKey);
+          if (lastDispenseTimestamp != null) {
+            final lastDispense = DateTime.fromMillisecondsSinceEpoch(
+              lastDispenseTimestamp,
+            );
+            if (now.difference(lastDispense).inSeconds < 60) {
+              // 已經處理過，更新狀態並跳過
+              if (_alarms[i].status == AlarmStatus.ready) {
+                _alarms[i].status = AlarmStatus.dispensed;
+                stateChanged = true;
+              }
+              _processedAlarms[alarm.id] = lastDispense;
+              continue;
+            }
+          }
+
+          // 觸發給藥
+          _alarms[i].status = AlarmStatus.dispensed;
+          stateChanged = true;
+          _processedAlarms[alarm.id] = now; // 記錄處理時間
+          await _prefs!.setInt(lastDispenseKey, now.millisecondsSinceEpoch);
+
+          // 新增歷史紀錄
+          _addLog(alarm.id, "自動給藥");
+
+          // 發送通知
+          await NotificationService.showNotification(
+            id: generateStableId(alarm.id),
+            title: '💊 ${getMemberName(alarm.memberId)} 的藥已發放！',
+            body: FormatUtils.formatMedicines(alarm.medicines),
+          );
+        }
+      }
+    }
+
+    if (stateChanged) {
+      await _saveData();
+      notifyListeners();
+    }
+
+    // 清理超過 5 分鐘的記錄
+    _processedAlarms.removeWhere(
+      (_, timestamp) => now.difference(timestamp).inMinutes > 5,
+    );
   }
 
   void addMember(String name, String relationship) async {

@@ -9,7 +9,7 @@ import 'notification_service.dart';
 import 'package:uuid/uuid.dart';
 
 // 產生穩定的 ID
-int _generateStableId(String id) {
+int generateStableId(String id) {
   var hash = 0;
   for (var i = 0; i < id.length; i++) {
     hash = 31 * hash + id.codeUnitAt(i);
@@ -39,14 +39,30 @@ Future<void> _handleDispenseTask(int alarmId) async {
   final String? alarmsJson = prefs.getString('alarms');
   final String? membersJson = prefs.getString('members');
   final String? logsJson = prefs.getString('logs');
+  final String lastDispenseKey = 'last_dispense_$alarmId';
 
   if (alarmsJson == null) return;
+
+  // 檢查是否在最近 1 分鐘內已經處理過
+  final lastDispenseTimestamp = prefs.getInt(lastDispenseKey);
+  final now = DateTime.now();
+  if (lastDispenseTimestamp != null) {
+    final lastDispense = DateTime.fromMillisecondsSinceEpoch(
+      lastDispenseTimestamp,
+    );
+    if (now.difference(lastDispense).inSeconds < 60) {
+      debugPrint(
+        '⏭️ 跳過重複觸發: alarmId=$alarmId (已在 ${now.difference(lastDispense).inSeconds} 秒前處理)',
+      );
+      return;
+    }
+  }
 
   final List<dynamic> decoded = jsonDecode(alarmsJson);
   List<AlarmCardModel> alarms =
       decoded.map((item) => AlarmCardModel.fromJson(item)).toList();
 
-  final index = alarms.indexWhere((a) => _generateStableId(a.id) == alarmId);
+  final index = alarms.indexWhere((a) => generateStableId(a.id) == alarmId);
 
   if (index != -1) {
     final alarm = alarms[index];
@@ -64,6 +80,9 @@ Future<void> _handleDispenseTask(int alarmId) async {
     }
 
     if (alarm.status == AlarmStatus.ready) {
+      // 記錄本次處理時間戳
+      await prefs.setInt(lastDispenseKey, now.millisecondsSinceEpoch);
+
       alarms[index].status = AlarmStatus.dispensed;
       await prefs.setString(
         'alarms',
@@ -126,7 +145,7 @@ class BackgroundService {
     final Set<int> scheduledIds = scheduledIdsStr.map(int.parse).toSet();
 
     final Set<int> activeIds =
-        activeAlarms.map((a) => _generateStableId(a.id)).toSet();
+        activeAlarms.map((a) => generateStableId(a.id)).toSet();
 
     final orphans = scheduledIds.difference(activeIds);
 
@@ -157,7 +176,7 @@ class BackgroundService {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
 
-    final int alarmId = _generateStableId(alarm.id);
+    final int alarmId = generateStableId(alarm.id);
     await AndroidAlarmManager.oneShotAt(
       scheduledDate,
       alarmId,
@@ -172,7 +191,7 @@ class BackgroundService {
   }
 
   static Future<void> cancelAlarm(String alarmId) async {
-    final int id = _generateStableId(alarmId);
+    final int id = generateStableId(alarmId);
     await AndroidAlarmManager.cancel(id);
     await _removeScheduledId(id);
   }
