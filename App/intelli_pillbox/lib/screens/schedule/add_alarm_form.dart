@@ -14,9 +14,13 @@ class AddAlarmForm extends StatefulWidget {
 }
 
 class _AddAlarmFormState extends State<AddAlarmForm> {
+  // 使用者選擇的鬧鐘時間
   late TimeOfDay _selectedTime;
+  // 使用者選擇的家庭成員 ID
   String? _selectedMemberId;
+  // 該鬧鐘包含的藥物列表
   late List<Medicine> _meds;
+  // 初始化標記，確保 didChangeDependencies 只執行一次初始化邏輯
   bool _isInit = false;
 
   @override
@@ -39,6 +43,8 @@ class _AddAlarmFormState extends State<AddAlarmForm> {
     }
   }
 
+  // 顯示新增藥物對話框
+  // 開啟一個對話框讓使用者輸入藥物名稱、數量和單位
   Future<void> _showAddMedicineDialog() async {
     final nameController = TextEditingController();
     final amountController = TextEditingController();
@@ -85,15 +91,11 @@ class _AddAlarmFormState extends State<AddAlarmForm> {
                       const SizedBox(width: 16),
                       DropdownButton<String>(
                         value: unit,
-                        items:
-                            ['顆', 'g', 'mg', 'ml', '包']
-                                .map(
-                                  (u) => DropdownMenuItem(
-                                    value: u,
-                                    child: Text(u),
-                                  ),
-                                )
-                                .toList(),
+                        items: ['顆', 'g', 'mg', 'ml', '包']
+                            .map(
+                              (u) => DropdownMenuItem(value: u, child: Text(u)),
+                            )
+                            .toList(),
                         onChanged: (v) => setState(() => unit = v!),
                       ),
                     ],
@@ -205,12 +207,9 @@ class _AddAlarmFormState extends State<AddAlarmForm> {
               filled: true,
               fillColor: Colors.white10,
             ),
-            items:
-                members
-                    .map(
-                      (m) => DropdownMenuItem(value: m.id, child: Text(m.name)),
-                    )
-                    .toList(),
+            items: members
+                .map((m) => DropdownMenuItem(value: m.id, child: Text(m.name)))
+                .toList(),
             onChanged: (val) => setState(() => _selectedMemberId = val),
           ),
           const SizedBox(height: 24),
@@ -242,46 +241,45 @@ class _AddAlarmFormState extends State<AddAlarmForm> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children:
-                  _meds
-                      .map(
-                        (m) => Chip(
-                          avatar: CircleAvatar(
-                            child: Text(m.unit.isNotEmpty ? m.unit[0] : ''),
-                          ),
-                          label: Text('${m.name} ${m.amount}${m.unit}'),
-                          onDeleted: () => setState(() => _meds.remove(m)),
-                        ),
-                      )
-                      .toList(),
+              children: _meds
+                  .map(
+                    (m) => Chip(
+                      avatar: CircleAvatar(
+                        child: Text(m.unit.isNotEmpty ? m.unit[0] : ''),
+                      ),
+                      label: Text('${m.name} ${m.amount}${m.unit}'),
+                      onDeleted: () => setState(() => _meds.remove(m)),
+                    ),
+                  )
+                  .toList(),
             ),
           const SizedBox(height: 32),
           FilledButton(
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
-            onPressed:
-                _meds.isEmpty
-                    ? null
-                    : () {
-                      if (_selectedMemberId != null) {
-                        if (isEditing) {
-                          context.read<AppProvider>().updateAlarm(
-                            widget.alarmToEdit!.id,
-                            _selectedTime,
-                            _meds,
-                            _selectedMemberId!,
-                          );
-                        } else {
-                          context.read<AppProvider>().addAlarm(
-                            _selectedTime,
-                            _meds,
-                            _selectedMemberId!,
-                          );
-                        }
-                        Navigator.pop(context);
+            onPressed: _meds.isEmpty
+                ? null
+                : () {
+                    // 儲存或更新鬧鐘設定
+                    if (_selectedMemberId != null) {
+                      if (isEditing) {
+                        context.read<AppProvider>().updateAlarm(
+                          widget.alarmToEdit!.id,
+                          _selectedTime,
+                          _meds,
+                          _selectedMemberId!,
+                        );
+                      } else {
+                        context.read<AppProvider>().addAlarm(
+                          _selectedTime,
+                          _meds,
+                          _selectedMemberId!,
+                        );
                       }
-                    },
+                      Navigator.pop(context);
+                    }
+                  },
             child: Text(
               isEditing ? '更新設定' : '儲存設定',
               style: const TextStyle(fontSize: 16),

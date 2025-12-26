@@ -2,10 +2,14 @@ import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
+  // FlutterLocalNotificationsPlugin 實例，用於管理通知
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  // 標記通知服務是否已初始化
   static bool _isInitialized = false;
 
+  // 初始化通知服務
+  // 設定 Android 和 iOS 的初始化設定，並請求權限
   static Future<void> initialize({bool requestPermissions = true}) async {
     if (_isInitialized) return;
 
@@ -24,11 +28,10 @@ class NotificationService {
     await _notificationsPlugin.initialize(initializationSettings);
 
     if (Platform.isAndroid && requestPermissions) {
-      final androidImplementation =
-          _notificationsPlugin
-              .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin
-              >();
+      final androidImplementation = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
 
       if (androidImplementation != null) {
         await androidImplementation.requestNotificationsPermission();
@@ -37,11 +40,10 @@ class NotificationService {
       }
     } else if (Platform.isAndroid && !requestPermissions) {
       // 即使不請求權限，也要建立頻道，否則無法發送通知
-      final androidImplementation =
-          _notificationsPlugin
-              .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin
-              >();
+      final androidImplementation = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (androidImplementation != null) {
         await _createNotificationChannels(androidImplementation);
       }
@@ -49,6 +51,8 @@ class NotificationService {
     _isInitialized = true;
   }
 
+  // 建立通知頻道
+  // 建立給藥提醒和取藥確認的通知頻道
   static Future<void> _createNotificationChannels(
     AndroidFlutterLocalNotificationsPlugin androidImplementation,
   ) async {
@@ -72,6 +76,8 @@ class NotificationService {
     await androidImplementation.createNotificationChannel(takenChannel);
   }
 
+  // 顯示通知
+  // 發送一個本地通知
   static Future<void> showNotification({
     required int id,
     required String title,

@@ -11,8 +11,11 @@ class HistoryTab extends StatefulWidget {
 }
 
 class _HistoryTabState extends State<HistoryTab> {
+  // 當前選擇查看歷史紀錄的日期
   DateTime _selectedDate = DateTime.now();
 
+  // 選擇日期
+  // 開啟日期選擇器，讓使用者選擇要查看的日期
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -42,13 +45,10 @@ class _HistoryTabState extends State<HistoryTab> {
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed:
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SettingsScreen(),
-                  ),
-                ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SettingsScreen()),
+            ),
           ),
         ],
       ),
@@ -62,13 +62,11 @@ class _HistoryTabState extends State<HistoryTab> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.chevron_left),
-                  onPressed:
-                      () => setState(
-                        () =>
-                            _selectedDate = _selectedDate.subtract(
-                              const Duration(days: 1),
-                            ),
-                      ),
+                  onPressed: () => setState(
+                    () => _selectedDate = _selectedDate.subtract(
+                      const Duration(days: 1),
+                    ),
+                  ),
                 ),
                 Text(
                   "${_selectedDate.year}/${_selectedDate.month}/${_selectedDate.day}",
@@ -76,49 +74,44 @@ class _HistoryTabState extends State<HistoryTab> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.chevron_right),
-                  onPressed:
-                      _selectedDate.day == DateTime.now().day
-                          ? null
-                          : () => setState(
-                            () =>
-                                _selectedDate = _selectedDate.add(
-                                  const Duration(days: 1),
-                                ),
+                  onPressed: _selectedDate.day == DateTime.now().day
+                      ? null
+                      : () => setState(
+                          () => _selectedDate = _selectedDate.add(
+                            const Duration(days: 1),
                           ),
+                        ),
                 ),
               ],
             ),
           ),
           Expanded(
-            child:
-                logs.isEmpty
-                    ? Center(
-                      child: Text(
-                        '本日無紀錄',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    )
-                    : ListView.builder(
-                      itemCount: logs.length,
-                      itemBuilder: (ctx, index) {
-                        final log = logs[index];
-                        final isTaken = log.action.contains("取藥");
-                        return ListTile(
-                          leading: Icon(
-                            isTaken
-                                ? Icons.check_circle
-                                : Icons.medical_services,
-                            color: isTaken ? Colors.green : Colors.amber,
-                          ),
-                          title: Text('${log.timeLabel} - ${log.memberName}'),
-                          subtitle: Text(log.action),
-                          trailing: Text(
-                            "${log.timestamp.hour}:${log.timestamp.minute.toString().padLeft(2, '0')}",
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        );
-                      },
+            child: logs.isEmpty
+                ? Center(
+                    child: Text(
+                      '本日無紀錄',
+                      style: Theme.of(context).textTheme.bodyLarge,
                     ),
+                  )
+                : ListView.builder(
+                    itemCount: logs.length,
+                    itemBuilder: (ctx, index) {
+                      final log = logs[index];
+                      final isTaken = log.action.contains("取藥");
+                      return ListTile(
+                        leading: Icon(
+                          isTaken ? Icons.check_circle : Icons.medical_services,
+                          color: isTaken ? Colors.green : Colors.amber,
+                        ),
+                        title: Text('${log.timeLabel} - ${log.memberName}'),
+                        subtitle: Text(log.action),
+                        trailing: Text(
+                          "${log.timestamp.hour}:${log.timestamp.minute.toString().padLeft(2, '0')}",
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

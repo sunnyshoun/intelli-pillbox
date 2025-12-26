@@ -10,23 +10,32 @@ import '../services/notification_service.dart';
 import '../utils/format_utils.dart';
 
 class AppProvider with ChangeNotifier, WidgetsBindingObserver {
+  // UUID 產生器實例，用於生成唯一的 ID
   final Uuid _uuid = const Uuid();
+  // SharedPreferences 實例，用於本地資料儲存
   SharedPreferences? _prefs;
+  // 定期檢查計時器，用於同步狀態和檢查前台鬧鐘
   Timer? _refreshTimer;
 
+  // 當前應用程式的主題模式 (系統、淺色、深色)
   ThemeMode _themeMode = ThemeMode.system;
   ThemeMode get themeMode => _themeMode;
 
+  // 家庭成員列表
   List<FamilyMember> _members = [
     FamilyMember(id: '1', name: '我', relationship: '本人'),
   ];
 
+  // 鬧鐘排程列表
   List<AlarmCardModel> _alarms = [];
+  // 歷史紀錄列表
   List<HistoryLog> _logs = [];
 
   List<FamilyMember> get members => _members;
   List<AlarmCardModel> get alarms => _alarms;
 
+  // 建構子
+  // 初始化 AppProvider，載入資料，註冊觀察者，並啟動定期檢查計時器
   AppProvider() {
     _initLoad();
     WidgetsBinding.instance.addObserver(this);
@@ -42,8 +51,11 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     });
   }
 
+  // 標記是否正在處理定期檢查，避免重複執行
   bool _isProcessing = false;
 
+  // 釋放資源
+  // 移除觀察者，取消計時器
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -51,6 +63,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     super.dispose();
   }
 
+  // 監聽應用程式生命週期變化
+  // 當應用程式恢復到前台時，同步資料
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -58,6 +72,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  // 初始化載入
+  // 從 SharedPreferences 載入主題、成員、鬧鐘、日誌等資料，並初始化通知服務
   Future<void> _initLoad() async {
     _prefs = await SharedPreferences.getInstance();
     await NotificationService.initialize();
@@ -88,6 +104,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // 儲存資料
+  // 將主題、成員、鬧鐘、日誌等資料儲存到 SharedPreferences
   Future<void> _saveData() async {
     if (_prefs == null) return;
     await _prefs!.setInt('themeMode', _themeMode.index);
@@ -105,6 +123,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     );
   }
 
+  // 顯示取藥通知
+  // 發送通知確認使用者已取藥
   Future<void> _showTakenNotification(
     String memberName,
     List<Medicine> medicines,
@@ -121,6 +141,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     );
   }
 
+  // 排程所有鬧鐘
+  // 將所有狀態為 ready 的鬧鐘加入排程
   Future<void> _scheduleAllAlarms() async {
     for (var alarm in _alarms) {
       if (alarm.status == AlarmStatus.ready) {
@@ -132,6 +154,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  // 從儲存同步狀態
+  // 檢查 SharedPreferences 中的資料是否有變更，若有則更新記憶體中的資料
   Future<void> _syncStateFromStorage() async {
     if (_prefs == null) return;
 
@@ -167,6 +191,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   // 記錄已處理的鬧鐘，避免重複觸發 (alarmId -> 觸發時間戳)
   final Map<String, DateTime> _processedAlarms = {};
 
+  // 檢查前台鬧鐘
+  // 檢查是否有鬧鐘需要在前台觸發，並執行給藥邏輯
   Future<void> _checkForegroundAlarms() async {
     if (_prefs == null) return;
     final now = DateTime.now();
@@ -238,6 +264,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     );
   }
 
+  // 新增成員
+  // 新增一個家庭成員並儲存
   void addMember(String name, String relationship) async {
     _members.add(
       FamilyMember(id: _uuid.v4(), name: name, relationship: relationship),
@@ -246,6 +274,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // 更新成員
+  // 更新現有家庭成員的資訊並儲存
   void updateMember(String id, String name, String relationship) async {
     final index = _members.indexWhere((m) => m.id == id);
     if (index != -1) {
@@ -256,6 +286,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  // 刪除成員
+  // 刪除指定的家庭成員及其相關的鬧鐘
   void deleteMember(String id) async {
     if (id == '1') return;
 
@@ -266,6 +298,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // 重新排序成員
+  // 調整家庭成員在列表中的順序
   void reorderMembers(int oldIndex, int newIndex) async {
     if (oldIndex < newIndex) newIndex -= 1;
     final FamilyMember item = _members.removeAt(oldIndex);
@@ -274,6 +308,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // 取得成員名稱
+  // 根據 ID 取得家庭成員的名稱
   String getMemberName(String id) {
     return _members
         .firstWhere(
@@ -283,6 +319,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         .name;
   }
 
+  // 新增鬧鐘
+  // 新增一個鬧鐘，儲存並排程
   void addAlarm(TimeOfDay time, List<Medicine> meds, String memberId) async {
     if (_alarms.length >= 8) return;
     final newAlarm = AlarmCardModel(
@@ -298,6 +336,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // 更新鬧鐘
+  // 更新現有鬧鐘的資訊，重新排程
   void updateAlarm(
     String id,
     TimeOfDay time,
@@ -322,6 +362,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  // 刪除鬧鐘
+  // 刪除指定的鬧鐘並取消排程
   void deleteAlarm(String id) async {
     await BackgroundService.cancelAlarm(id);
     _alarms.removeWhere((a) => a.id == id);
@@ -329,6 +371,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // 排序鬧鐘
+  // 根據時間對鬧鐘列表進行排序
   void _sortAlarms() {
     _alarms.sort((a, b) {
       int aMin = a.time.hour * 60 + a.time.minute;
@@ -337,6 +381,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     });
   }
 
+  // 模擬取藥
+  // 將鬧鐘狀態設為 taken，記錄日誌並發送通知
   void simulateTakeMedicine(String alarmId) async {
     int index = _alarms.indexWhere((a) => a.id == alarmId);
     if (index != -1 && _alarms[index].status == AlarmStatus.dispensed) {
@@ -351,6 +397,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  // 補充所有藥物
+  // 將所有鬧鐘狀態重置為 ready，並重新排程
   void refillAll() async {
     for (var alarm in _alarms) {
       alarm.status = AlarmStatus.ready;
@@ -360,16 +408,17 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // 新增日誌
+  // 新增一條歷史日誌
   void _addLog(String alarmId, String action) {
     var alarm = _alarms.firstWhere(
       (a) => a.id == alarmId,
-      orElse:
-          () => AlarmCardModel(
-            id: '',
-            time: TimeOfDay.now(),
-            medicines: [],
-            memberId: '',
-          ),
+      orElse: () => AlarmCardModel(
+        id: '',
+        time: TimeOfDay.now(),
+        medicines: [],
+        memberId: '',
+      ),
     );
     if (alarm.id == '') return;
     var memberName = getMemberName(alarm.memberId);
@@ -387,6 +436,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     );
   }
 
+  // 模擬給藥
+  // 手動觸發給藥邏輯，更新狀態並記錄日誌
   void simulateDispense(String alarmId) async {
     int index = _alarms.indexWhere((a) => a.id == alarmId);
     if (index != -1 && _alarms[index].status == AlarmStatus.ready) {
@@ -397,6 +448,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  // 切換主題
+  // 在淺色、深色和系統主題之間切換
   void toggleTheme() async {
     if (_themeMode == ThemeMode.system) {
       _themeMode = ThemeMode.light;
@@ -409,6 +462,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // 根據日期取得日誌
+  // 篩選指定日期的歷史日誌
   List<HistoryLog> getLogsByDate(DateTime date) {
     return _logs
         .where(

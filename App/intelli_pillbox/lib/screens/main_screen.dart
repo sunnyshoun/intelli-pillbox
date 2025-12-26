@@ -11,9 +11,13 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  // 當前選中的底部導航欄索引 (預設為 1: 給藥排程)
   int _selectedIndex = 1;
+  // 頁面控制器，用於控制 PageView 的切換
   final PageController _pageController = PageController(initialPage: 1);
 
+  // 處理底部導航欄點擊事件
+  // 更新選中的索引並切換頁面
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;

@@ -9,6 +9,7 @@ import 'notification_service.dart';
 import 'package:uuid/uuid.dart';
 
 // 產生穩定的 ID
+// 根據字串 ID 生成一個穩定的整數 ID，用於 AlarmManager
 int generateStableId(String id) {
   var hash = 0;
   for (var i = 0; i < id.length; i++) {
@@ -19,6 +20,7 @@ int generateStableId(String id) {
 }
 
 // AlarmManager 回調函數
+// 當鬧鐘觸發時，系統會呼叫此函式
 @pragma('vm:entry-point')
 void alarmCallback(int alarmId) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +35,7 @@ void alarmCallback(int alarmId) async {
 }
 
 // 處理給藥任務
+// 執行給藥相關邏輯：檢查是否重複觸發、更新狀態、發送通知、記錄歷史
 Future<void> _handleDispenseTask(int alarmId) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.reload(); // Ensure we have the latest data
@@ -59,8 +62,9 @@ Future<void> _handleDispenseTask(int alarmId) async {
   }
 
   final List<dynamic> decoded = jsonDecode(alarmsJson);
-  List<AlarmCardModel> alarms =
-      decoded.map((item) => AlarmCardModel.fromJson(item)).toList();
+  List<AlarmCardModel> alarms = decoded
+      .map((item) => AlarmCardModel.fromJson(item))
+      .toList();
 
   final index = alarms.indexWhere((a) => generateStableId(a.id) == alarmId);
 
@@ -131,21 +135,27 @@ Future<void> _handleDispenseTask(int alarmId) async {
 }
 
 class BackgroundService {
+  // SharedPreferences 中儲存已排程鬧鐘 ID 列表的鍵值
   static const String _prefsKeyScheduledAlarmIds = 'scheduled_alarm_ids';
 
+  // 初始化背景服務
+  // 初始化 AndroidAlarmManager 和 NotificationService
   static Future<void> initialize() async {
     await AndroidAlarmManager.initialize();
     await NotificationService.initialize();
   }
 
+  // 同步鬧鐘
+  // 比較 activeAlarms 和已排程的鬧鐘，取消不再需要的鬧鐘
   static Future<void> syncAlarms(List<AlarmCardModel> activeAlarms) async {
     final prefs = await SharedPreferences.getInstance();
     final List<String> scheduledIdsStr =
         prefs.getStringList(_prefsKeyScheduledAlarmIds) ?? [];
     final Set<int> scheduledIds = scheduledIdsStr.map(int.parse).toSet();
 
-    final Set<int> activeIds =
-        activeAlarms.map((a) => generateStableId(a.id)).toSet();
+    final Set<int> activeIds = activeAlarms
+        .map((a) => generateStableId(a.id))
+        .toSet();
 
     final orphans = scheduledIds.difference(activeIds);
 
@@ -159,6 +169,8 @@ class BackgroundService {
     );
   }
 
+  // 排程鬧鐘
+  // 設定一個新的鬧鐘，如果時間已過則設為明天
   static Future<void> scheduleAlarm(
     AlarmCardModel alarm,
     String memberName,
@@ -190,12 +202,16 @@ class BackgroundService {
     await _addScheduledId(alarmId);
   }
 
+  // 取消鬧鐘
+  // 根據 alarmId 取消已排程的鬧鐘
   static Future<void> cancelAlarm(String alarmId) async {
     final int id = generateStableId(alarmId);
     await AndroidAlarmManager.cancel(id);
     await _removeScheduledId(id);
   }
 
+  // 新增已排程 ID
+  // 將 alarmId 加入到 SharedPreferences 中的已排程列表
   static Future<void> _addScheduledId(int id) async {
     final prefs = await SharedPreferences.getInstance();
     final List<String> ids =
@@ -207,6 +223,8 @@ class BackgroundService {
     }
   }
 
+  // 移除已排程 ID
+  // 從 SharedPreferences 中的已排程列表移除 alarmId
   static Future<void> _removeScheduledId(int id) async {
     final prefs = await SharedPreferences.getInstance();
     final List<String> ids =
